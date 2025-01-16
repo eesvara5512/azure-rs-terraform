@@ -1,0 +1,104 @@
+azure login steps in visual studio code:
+
+1. open any visual studio code azure and open terminal
+
+
+2. >> az login --tenant <TENANTid>
+
+after above the command take/save below the data after output:
+
+
+   "id": "",
+    "isDefault": true,
+    "managedByTenants": [],
+    "name": "Azure subscription 1",
+    "state": "Enabled",
+    "tenantId": "",
+    "user": {
+      "name": "pavi.rushi.uk@gmail.com",
+      "type": "user"
+    }
+  }
+]
+
+3. set the account with subscription the Azure CLI. Use "id" above
+
+>> az account set --subscription "subID"
+
+
+If you're creating a service principal from Git Bash, set the MSYS_NO_PATHCONV environment variable. (This step isn't necessary if you're using Cloud Shell.)
+
+step1:
+
+export MSYS_NO_PATHCONV=1
+
+
+4. Create a Service Principal
+Next, create a Service Principal. A Service Principal is an application within Azure Active Directory with the authentication tokens Terraform needs to perform actions on your behalf. Update the <SUBSCRIPTION_ID> with the subscription ID you specified in the previous step.
+
+command:
+
+>> az ad sp create-for-rbac --role="Contributor" --scopes="/subscriptions/<SUBSCRIPTION_ID>"
+
+output:
+
+PS D:\Inmarsat_Azure> az ad sp create-for-rbac --role="Contributor" --scopes="/subscriptions/<SUBSCRIPTION_ID>"
+Creating 'Contributor' role assignment under scope '/subscriptions/<SUBSCRIPTION_ID>'
+The output includes credentials that you must protect. Be sure that you do not include these credentials in your code or check the credentials into your source control. For more information, see https://aka.ms/azadsp-cli
+{
+  "appId": "",
+  "displayName": "azure-cli-2022-11-11-21-21-29",
+  "password": "",
+  "tenant": ""
+}
+
+
+5. Set your environment variables
+HashiCorp recommends setting these values as environment variables rather than saving them in your Terraform configuration.
+
+In your terminal, set the following environment variables. Be sure to update the variable values with the values Azure returned in the previous command.
+
+  windows/powershell:
+
+$ $Env:ARM_CLIENT_ID = "<APPID_VALUE>"
+$ $Env:ARM_CLIENT_SECRET = "<PASSWORD_VALUE>"
+$ $Env:ARM_SUBSCRIPTION_ID = "<SUBSCRIPTION_ID>"
+$ $Env:ARM_TENANT_ID = "<TENANT_VALUE>"
+
+  Bash/linux:
+
+ export ARM_CLIENT_ID="<APPID_VALUE>"
+ export ARM_CLIENT_SECRET="<PASSWORD_VALUE>"
+ export ARM_SUBSCRIPTION_ID="<SUBSCRIPTION_ID>"
+ export ARM_TENANT_ID="<TENANT_VALUE>"
+
+ export ARM_CLIENT_ID=""
+ export ARM_CLIENT_SECRET=""
+ export ARM_SUBSCRIPTION_ID="<SUBSCRIPTION_ID>"
+ export ARM_TENANT_ID=""
+
+
+####################################################
+after the configuration start the writing terraform
+#####################################################
+
+after code ready
+
+1. terraform init
+2. terraform fmt
+3. terraform validate
+4. terraform plan
+5. terraform apply
+
+
+states:
+
+1. Inspect the current state using terraform show.
+terraform show
+
+2. If you have a long state file, you can see a list of the resources you created with Terraform by using the list subcommand.
+
+terraform state list
+
+3. If you run terraform state, you will see a full list of available commands to view and manipulate the configuration's state.
+terraform state
