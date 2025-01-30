@@ -1,0 +1,105 @@
+Steps to Pass Input Variables in CDKTF
+Define Input Variables using TerraformVariable.
+Pass Values dynamically via CLI, environment variables, or cdktf.json.
+Use the Variables in the Stack.
+1. Install Dependencies
+Ensure you have CDKTF and the Azure provider installed:
+
+sh
+Copy
+Edit
+npm install --save @cdktf/provider-azurerm cdktf-cli
+2. Define Input Variables in CDKTF (TypeScript)
+Create or modify main.ts:
+
+typescript
+Copy
+Edit
+import { Construct } from "constructs";
+import { App, TerraformStack, TerraformVariable } from "cdktf";
+import { AzurermProvider, ResourceGroup } from "@cdktf/provider-azurerm";
+
+class MyAzureStack extends TerraformStack {
+  constructor(scope: Construct, id: string) {
+    super(scope, id);
+
+    new AzurermProvider(this, "AzureRm", {
+      features: {},
+    });
+
+    // Define input variables
+    const resourceGroupName = new TerraformVariable(this, "resource_group_name", {
+      type: "string",
+      description: "The name of the Azure Resource Group",
+      default: "default-rg",
+    });
+
+    const location = new TerraformVariable(this, "location", {
+      type: "string",
+      description: "Azure region for deployment",
+      default: "East US",
+    });
+
+    // Use input variables
+    new ResourceGroup(this, "ResourceGroup", {
+      name: resourceGroupName.value,
+      location: location.value,
+    });
+  }
+}
+
+const app = new App();
+new MyAzureStack(app, "MyAzureCDKTF");
+app.synth();
+
+
+3. Passing Values as Input Variables
+Option 1: Pass Variables via CLI
+Run:
+
+
+cdktf deploy -var="resource_group_name=my-rg" -var="location=West Europe"
+
+
+Option 2: Use cdktf.json
+Create a cdktf.json file:
+
+
+{
+  "terraformVariableValues": {
+    "resource_group_name": "my-json-rg",
+    "location": "North Europe"
+  }
+}
+Then deploy:
+
+cdktf deploy
+
+
+Option 3: Use Environment Variables
+
+export TF_VAR_resource_group_name="env-rg"
+export TF_VAR_location="South Central US"
+cdktf deploy
+
+
+4. Deploy & Verify
+Run:
+
+
+cdktf deploy
+To destroy:
+
+
+cdktf destroy
+This approach allows you to use Terraform-like input variables in CDKTF, making your infrastructure more reusable and configurable.
+
+Would you like an example with more Azure services (e.g., Virtual Machines, Storage Accounts)? 🚀
+
+
+
+
+
+
+
+
