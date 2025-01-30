@@ -1,0 +1,103 @@
+Project Structure
+
+cdktf-azure-project/
+│── cdktf.json
+│── main.ts                # Entry point
+│── variables.ts           # Input variables as function parameters
+│── resource-group.ts      # Define Azure resources
+│── cdktf.out/             # CDKTF output (auto-generated)
+1. Define Input Variables as Parameters (variables.ts)
+Instead of using TerraformVariable, we pass all input values as constructor parameters.
+
+typescript
+
+export interface InputParams {
+  resourceGroupName: string;
+  location: string;
+}
+2. Define Resources (resource-group.ts)
+Modify the resource definition to accept parameters instead of using TerraformVariable.
+
+typescript
+
+import { Construct } from "constructs";
+import { ResourceGroup } from "@cdktf/provider-azurerm";
+import { InputParams } from "./variables";
+
+export class MyResourceGroup extends Construct {
+  constructor(scope: Construct, id: string, params: InputParams) {
+    super(scope, id);
+
+    new ResourceGroup(this, "ResourceGroup", {
+      name: params.resourceGroupName,
+      location: params.location,
+    });
+  }
+}
+3. Main Stack (main.ts)
+This is where we pass all inputs as function parameters.
+
+typescript
+
+import { App, TerraformStack } from "cdktf";
+import { AzurermProvider } from "@cdktf/provider-azurerm";
+import { MyResourceGroup } from "./resource-group";
+import { InputParams } from "./variables";
+
+class MyAzureStack extends TerraformStack {
+  constructor(scope: App, id: string, params: InputParams) {
+    super(scope, id);
+
+    new AzurermProvider(this, "AzureRm", {
+      features: {},
+    });
+
+    // Deploy Azure Resource Group using parameters
+    new MyResourceGroup(this, "MyResourceGroup", params);
+  }
+}
+
+// Read values from environment variables or defaults
+const params: InputParams = {
+  resourceGroupName: process.env.RESOURCE_GROUP_NAME || "default-rg",
+  location: process.env.LOCATION || "East US",
+};
+
+const app = new App();
+new MyAzureStack(app, "MyAzureCDKTF", params);
+app.synth();
+4. Passing Input Values Dynamically
+Option 1: Pass via CLI
+
+RESOURCE_GROUP_NAME=my-rg LOCATION="West Europe" cdktf deploy
+Option 2: Use cdktf.json
+Create a cdktf.json file:
+
+
+{
+  "terraformVariableValues": {
+    "RESOURCE_GROUP_NAME": "json-rg",
+    "LOCATION": "North Europe"
+  }
+}
+Then deploy:
+
+
+cdktf deploy
+Option 3: Use Direct Parameters in Code
+Modify main.ts:
+
+typescript
+Copy
+Edit
+const params: InputParams = {
+  resourceGroupName: "hardcoded-rg",
+  location: "West Europe",
+};
+5. Deploy & Verify
+
+cdktf deploy
+To destroy:
+
+t
+cdktf destroy
