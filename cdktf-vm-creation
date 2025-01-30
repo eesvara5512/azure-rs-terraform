@@ -1,0 +1,263 @@
+
+To create an Azure Ubuntu Virtual Machine (VM) using CDK for Terraform (CDKTF) while keeping each resource in a separate script, follow this modular approach.
+
+Project Structure
+csharp
+Copy
+Edit
+cdktf-azure-vm/
+│── cdktf.json
+│── main.ts                 # Entry point
+│── variables.ts            # Define input parameters
+│── resource-group.ts       # Resource Group
+│── virtual-network.ts      # Virtual Network
+│── subnet.ts               # Subnet
+│── public-ip.ts            # Public IP
+│── network-interface.ts    # Network Interface
+│── virtual-machine.ts      # Ubuntu Virtual Machine
+│── cdktf.out/              # CDKTF output (auto-generated)
+1. Define Input Parameters (variables.ts)
+This file contains parameter definitions instead of Terraform variables.
+
+typescript
+Copy
+Edit
+export interface InputParams {
+  resourceGroupName: string;
+  location: string;
+  virtualNetworkName: string;
+  subnetName: string;
+  publicIpName: string;
+  networkInterfaceName: string;
+  vmName: string;
+  vmSize: string;
+  adminUsername: string;
+  adminPassword: string;
+}
+2. Resource Group (resource-group.ts)
+Creates a Resource Group.
+
+typescript
+Copy
+Edit
+import { Construct } from "constructs";
+import { ResourceGroup } from "@cdktf/provider-azurerm";
+import { InputParams } from "./variables";
+
+export class MyResourceGroup extends Construct {
+  public readonly rg: ResourceGroup;
+
+  constructor(scope: Construct, id: string, params: InputParams) {
+    super(scope, id);
+
+    this.rg = new ResourceGroup(this, "ResourceGroup", {
+      name: params.resourceGroupName,
+      location: params.location,
+    });
+  }
+}
+3. Virtual Network (virtual-network.ts)
+Creates an Azure Virtual Network (VNet).
+
+typescript
+Copy
+Edit
+import { Construct } from "constructs";
+import { VirtualNetwork } from "@cdktf/provider-azurerm";
+import { InputParams } from "./variables";
+import { MyResourceGroup } from "./resource-group";
+
+export class MyVirtualNetwork extends Construct {
+  public readonly vnet: VirtualNetwork;
+
+  constructor(scope: Construct, id: string, params: InputParams, rg: MyResourceGroup) {
+    super(scope, id);
+
+    this.vnet = new VirtualNetwork(this, "VirtualNetwork", {
+      name: params.virtualNetworkName,
+      location: rg.rg.location,
+      resourceGroupName: rg.rg.name,
+      addressSpace: ["10.0.0.0/16"],
+    });
+  }
+}
+4. Subnet (subnet.ts)
+Creates a Subnet inside the VNet.
+
+typescript
+Copy
+Edit
+import { Construct } from "constructs";
+import { Subnet } from "@cdktf/provider-azurerm";
+import { InputParams } from "./variables";
+import { MyVirtualNetwork } from "./virtual-network";
+
+export class MySubnet extends Construct {
+  public readonly subnet: Subnet;
+
+  constructor(scope: Construct, id: string, params: InputParams, vnet: MyVirtualNetwork) {
+    super(scope, id);
+
+    this.subnet = new Subnet(this, "Subnet", {
+      name: params.subnetName,
+      resourceGroupName: vnet.vnet.resourceGroupName,
+      virtualNetworkName: vnet.vnet.name,
+      addressPrefixes: ["10.0.1.0/24"],
+    });
+  }
+}
+5. Public IP (public-ip.ts)
+Creates a Public IP Address.
+
+typescript
+Copy
+Edit
+import { Construct } from "constructs";
+import { PublicIp } from "@cdktf/provider-azurerm";
+import { InputParams } from "./variables";
+import { MyResourceGroup } from "./resource-group";
+
+export class MyPublicIp extends Construct {
+  public readonly publicIp: PublicIp;
+
+  constructor(scope: Construct, id: string, params: InputParams, rg: MyResourceGroup) {
+    super(scope, id);
+
+    this.publicIp = new PublicIp(this, "PublicIp", {
+      name: params.publicIpName,
+      location: rg.rg.location,
+      resourceGroupName: rg.rg.name,
+      allocationMethod: "Dynamic",
+    });
+  }
+}
+6. Network Interface (network-interface.ts)
+Creates a Network Interface Card (NIC).
+
+typescript
+Copy
+Edit
+import { Construct } from "constructs";
+import { NetworkInterface } from "@cdktf/provider-azurerm";
+import { InputParams } from "./variables";
+import { MySubnet } from "./subnet";
+import { MyPublicIp } from "./public-ip";
+
+export class MyNetworkInterface extends Construct {
+  public readonly nic: NetworkInterface;
+
+  constructor(scope: Construct, id: string, params: InputParams, subnet: MySubnet, publicIp: MyPublicIp) {
+    super(scope, id);
+
+    this.nic = new NetworkInterface(this, "NetworkInterface", {
+      name: params.networkInterfaceName,
+      location: subnet.subnet.location,
+      resourceGroupName: subnet.subnet.resourceGroupName,
+
+      ipConfiguration: [{
+        name: "nic-ipconfig",
+        subnetId: subnet.subnet.id,
+        privateIpAddressAllocation: "Dynamic",
+        publicIpAddressId: publicIp.publicIp.id,
+      }],
+    });
+  }
+}
+7. Virtual Machine (virtual-machine.ts)
+Creates the Ubuntu Virtual Machine.
+
+typescript
+Copy
+Edit
+import { Construct } from "constructs";
+import { LinuxVirtualMachine } from "@cdktf/provider-azurerm";
+import { InputParams } from "./variables";
+import { MyResourceGroup } from "./resource-group";
+import { MyNetworkInterface } from "./network-interface";
+
+export class MyVirtualMachine extends Construct {
+  constructor(scope: Construct, id: string, params: InputParams, rg: MyResourceGroup, nic: MyNetworkInterface) {
+    super(scope, id);
+
+    new LinuxVirtualMachine(this, "VirtualMachine", {
+      name: params.vmName,
+      location: rg.rg.location,
+      resourceGroupName: rg.rg.name,
+      size: params.vmSize,
+      adminUsername: params.adminUsername,
+      adminPassword: params.adminPassword,
+      disablePasswordAuthentication: false,
+
+      networkInterfaceIds: [nic.nic.id],
+
+      osDisk: {
+        caching: "ReadWrite",
+        storageAccountType: "Standard_LRS",
+      },
+
+      sourceImageReference: {
+        publisher: "Canonical",
+        offer: "UbuntuServer",
+        sku: "20_04-lts",
+        version: "latest",
+      },
+    });
+  }
+}
+8. Main Stack (main.ts)
+This is where we pass all parameters and create resources.
+
+typescript
+Copy
+Edit
+import { App, TerraformStack } from "cdktf";
+import { AzurermProvider } from "@cdktf/provider-azurerm";
+import { MyResourceGroup } from "./resource-group";
+import { MyVirtualNetwork } from "./virtual-network";
+import { MySubnet } from "./subnet";
+import { MyPublicIp } from "./public-ip";
+import { MyNetworkInterface } from "./network-interface";
+import { MyVirtualMachine } from "./virtual-machine";
+import { InputParams } from "./variables";
+
+class MyAzureStack extends TerraformStack {
+  constructor(scope: App, id: string, params: InputParams) {
+    super(scope, id);
+
+    new AzurermProvider(this, "AzureRm", { features: {} });
+
+    const rg = new MyResourceGroup(this, "MyResourceGroup", params);
+    const vnet = new MyVirtualNetwork(this, "MyVirtualNetwork", params, rg);
+    const subnet = new MySubnet(this, "MySubnet", params, vnet);
+    const publicIp = new MyPublicIp(this, "MyPublicIp", params, rg);
+    const nic = new MyNetworkInterface(this, "MyNetworkInterface", params, subnet, publicIp);
+    new MyVirtualMachine(this, "MyVirtualMachine", params, rg, nic);
+  }
+}
+
+const params: InputParams = {
+  resourceGroupName: "myResourceGroup",
+  location: "East US",
+  virtualNetworkName: "myVNet",
+  subnetName: "mySubnet",
+  publicIpName: "myPublicIP",
+  networkInterfaceName: "myNIC",
+  vmName: "myUbuntuVM",
+  vmSize: "Standard_B1s",
+  adminUsername: "azureuser",
+  adminPassword: "MySecureP@ssw0rd",
+};
+
+const app = new App();
+new MyAzureStack(app, "MyAzureCDKTF", params);
+app.synth();
+Deploy & Verify
+sh
+Copy
+Edit
+cdktf deploy
+To destroy:
+
+sh
+Copy
+Edit
