@@ -1,0 +1,124 @@
+cdktf-azure-project/
+│── cdktf.json
+│── main.ts                # Entry point
+│── variables.ts           # Define input variables
+│── resource-group.ts      # Define Azure resources (e.g., Resource Group)
+│── cdktf.out/             # CDKTF output (auto-generated)
+
+
+1. Define Input Variables (variables.ts)
+This file contains Terraform input variables using TerraformVariable.
+
+import { TerraformVariable } from "cdktf";
+import { TerraformStack } from "cdktf";
+
+export class InputVariables {
+  resourceGroupName: TerraformVariable;
+  location: TerraformVariable;
+
+  constructor(stack: TerraformStack) {
+    this.resourceGroupName = new TerraformVariable(stack, "resource_group_name", {
+      type: "string",
+      description: "The name of the Azure Resource Group",
+      default: "default-rg",
+    });
+
+    this.location = new TerraformVariable(stack, "location", {
+      type: "string",
+      description: "Azure region for deployment",
+      default: "East US",
+    });
+  }
+}
+
+
+
+
+2. Define Resources (resource-group.ts)
+Create a separate file for defining Azure resources.
+
+import { Construct } from "constructs";
+import { ResourceGroup } from "@cdktf/provider-azurerm";
+import { InputVariables } from "./variables";
+
+export class MyResourceGroup extends Construct {
+  constructor(scope: Construct, id: string, inputVars: InputVariables) {
+    super(scope, id);
+
+    new ResourceGroup(this, "ResourceGroup", {
+      name: inputVars.resourceGroupName.value,
+      location: inputVars.location.value,
+    });
+  }
+}
+
+
+
+3. Main Stack (main.ts)
+This file initializes Terraform and loads the variables and resource definitions.
+
+import { App, TerraformStack } from "cdktf";
+import { AzurermProvider } from "@cdktf/provider-azurerm";
+import { MyResourceGroup } from "./resource-group";
+import { InputVariables } from "./variables";
+
+class MyAzureStack extends TerraformStack {
+  constructor(scope: App, id: string) {
+    super(scope, id);
+
+    new AzurermProvider(this, "AzureRm", {
+      features: {},
+    });
+
+    // Load input variables
+    const inputVars = new InputVariables(this);
+
+    // Deploy Azure Resource Group
+    new MyResourceGroup(this, "MyResourceGroup", inputVars);
+  }
+}
+
+const app = new App();
+new MyAzureStack(app, "MyAzureCDKTF");
+app.synth();
+
+==============================
+
+4. Passing Input Variables
+Option 1: Pass via CLI
+
+cdktf deploy -var="resource_group_name=my-rg" -var="location=West Europe"
+
+
+=========================
+
+Option 2: Use cdktf.json
+Create a cdktf.json file:
+
+{
+  "terraformVariableValues": {
+    "resource_group_name": "json-rg",
+    "location": "North Europe"
+  }
+}
+
+Then deploy:
+
+
+cdktf deploy
+
+==========================
+
+Option 3: Use Environment Variables
+
+export TF_VAR_resource_group_name="env-rg"
+export TF_VAR_location="South Central US"
+cdktf deploy
+
+=============================
+
+5. Deploy & Verify
+cdktf deploy
+
+To destroy:
+cdktf destroy
