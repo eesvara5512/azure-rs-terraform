@@ -1,0 +1,145 @@
+AWS CDK for Terraform (CDKTF) - Deploy Azure VM and Upload State File
+CDK for Terraform (CDKTF) allows you to define Terraform infrastructure using TypeScript while leveraging Terraform providers.
+
+
+Use CDKTF (AWS CDK for Terraform) with TypeScript
+Create an Azure Resource Group
+Deploy an Azure Virtual Machine
+Upload a State File to Azure Storage (After VM Deployment)
+
+Step 1: Install CDKTF and Terraform Provider for Azure
+Before running the script, make sure you have CDKTF and Terraform installed.
+
+Install CDKTF
+
+npm install -g cdktf-cli
+Initialize a CDKTF Project
+
+mkdir cdktf-azure-vm
+cd cdktf-azure-vm
+cdktf init --template=typescript
+Install Required Terraform Providers
+
+npm install @cdktf/provider-azurerm
+npm install @cdktf/provider-local
+@cdktf/provider-azurerm → Allows managing Azure resources.
+@cdktf/provider-local → Enables local file handling (useful for state files).
+Step 2: Define CDKTF Stack
+Create a main.ts file and add the following code:
+
+typescript
+
+import { Construct } from "constructs";
+import { App, TerraformStack, TerraformOutput } from "cdktf";
+import { AzurermProvider, ResourceGroup, VirtualMachine, StorageAccount, StorageContainer, StorageBlob } from "@cdktf/provider-azurerm";
+import { LocalFile } from "@cdktf/provider-local";
+
+class AzureVmStack extends TerraformStack {
+  constructor(scope: Construct, id: string) {
+    super(scope, id);
+
+    // Define Azure Provider
+    new AzurermProvider(this, "AzureRm", {
+      features: {},
+    });
+
+    const location = "East US";
+    const resourceGroupName = "my-resource-group";
+    const vmName = "my-vm";
+    const storageAccountName = "mycdktfstorage";
+    const containerName = "state-files";
+    const stateFilePath = "statefile.json";
+
+    // Create a Resource Group
+    const resourceGroup = new ResourceGroup(this, "ResourceGroup", {
+      name: resourceGroupName,
+      location: location,
+    });
+
+    // Create a Storage Account
+    const storageAccount = new StorageAccount(this, "StorageAccount", {
+      name: storageAccountName,
+      resourceGroupName: resourceGroup.name,
+      location: resourceGroup.location,
+      accountTier: "Standard",
+      accountReplicationType: "LRS",
+    });
+
+    // Create a Storage Container
+    const storageContainer = new StorageContainer(this, "StorageContainer", {
+      name: containerName,
+      storageAccountName: storageAccount.name,
+    });
+
+    // Generate a Local State File (Simulating a Terraform State File)
+    const localFile = new LocalFile(this, "LocalStateFile", {
+      filename: stateFilePath,
+      content: JSON.stringify({
+        message: "This is a test Terraform state file for CDKTF!",
+        timestamp: new Date().toISOString(),
+      }),
+    });
+
+    // Upload the State File to Azure Storage
+    new StorageBlob(this, "StorageBlob", {
+      name: "terraform-state.json",
+      storageAccountName: storageAccount.name,
+      storageContainerName: storageContainer.name,
+      type: "Block",
+      source: localFile.filename,
+    });
+
+    // Create a Virtual Machine
+    new VirtualMachine(this, "VirtualMachine", {
+      name: vmName,
+      location: resourceGroup.location,
+      resourceGroupName: resourceGroup.name,
+      networkInterfaceIds: ["/subscriptions/YOUR_SUBSCRIPTION_ID/resourceGroups/YOUR_RESOURCE_GROUP/providers/Microsoft.Network/networkInterfaces/YOUR_NIC_ID"],
+      vmSize: "Standard_D2s_v3",
+      osProfile: {
+        computerName: vmName,
+        adminUsername: "azureuser",
+        adminPassword: "YourSecurePassword123!",
+      },
+      storageOsDisk: {
+        name: "osdisk",
+        caching: "ReadWrite",
+        createOption: "FromImage",
+        managedDiskType: "Standard_LRS",
+      },
+      storageImageReference: {
+        publisher: "Canonical",
+        offer: "UbuntuServer",
+        sku: "18.04-LTS",
+        version: "latest",
+      },
+    });
+
+    // Terraform Output
+    new TerraformOutput(this, "ResourceGroupName", {
+      value: resourceGroup.name,
+    });
+
+    new TerraformOutput(this, "StorageAccountName", {
+      value: storageAccount.name,
+    });
+
+    new TerraformOutput(this, "StateFileUploaded", {
+      value: `State file uploaded to container: ${containerName}`,
+    });
+  }
+}
+
+const app = new App();
+new AzureVmStack(app, "cdktf-azure-vm");
+app.synth();
+Step 3: Deploy Using CDKTF
+Compile TypeScript
+
+npm run build
+Generate Terraform Configuration
+
+cdktf synth
+Deploy the Infrastructure
+
+cdktf deploy
