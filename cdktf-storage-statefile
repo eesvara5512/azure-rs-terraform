@@ -1,0 +1,104 @@
+1. Initialize CDKTF Project
+Run the following command to create a new CDKTF project:
+
+
+cdktf init --template=typescript
+2. Install Dependencies
+Install the required Terraform provider:
+
+
+cdktf provider add hashicorp/azurerm
+3. Create the Azure Storage Account using CDKTF
+Create a file named main.ts and add the following code:
+
+
+import { Construct } from "constructs";
+import { App, TerraformStack, TerraformOutput } from "cdktf";
+import { AzurermProvider, StorageAccount, ResourceGroup } from "./.gen/providers/azurerm";
+
+class MyStack extends TerraformStack {
+  constructor(scope: Construct, name: string) {
+    super(scope, name);
+
+    // Define Azure Provider
+    new AzurermProvider(this, "AzureRm", {
+      features: {},
+    });
+
+    // Create Resource Group
+    const resourceGroup = new ResourceGroup(this, "resourceGroup", {
+      name: "cdktf-resource-group",
+      location: "East US",
+    });
+
+    // Create Storage Account
+    const storageAccount = new StorageAccount(this, "storageAccount", {
+      name: "cdktfstorageacct",
+      resourceGroupName: resourceGroup.name,
+      location: resourceGroup.location,
+      accountTier: "Standard",
+      accountReplicationType: "LRS",
+    });
+
+    // Output Storage Account Name
+    new TerraformOutput(this, "storageAccountName", {
+      value: storageAccount.name,
+    });
+  }
+}
+
+const app = new App();
+new MyStack(app, "cdktf-azure-storage");
+app.synth();
+
+4. Configure Terraform Backend for Azure Storage
+Modify cdktf.json or main.ts to specify Azure Blob Storage as the backend.
+
+Backend Configuration (Modify main.ts)
+
+import { RemoteBackend } from "cdktf";
+
+new RemoteBackend(stack, {
+  hostname: "app.terraform.io",
+  organization: "my-org",
+  workspaces: {
+    name: "cdktf-azure-storage",
+  },
+});
+
+
+Alternatively, modify cdktf.json:
+
+
+{
+  "terraform": {
+    "backend": {
+      "azurerm": {
+        "resource_group_name": "terraform-backend-rg",
+        "storage_account_name": "terraformbackendsa",
+        "container_name": "tfstate",
+        "key": "cdktf.tfstate"
+      }
+    }
+  }
+}
+
+
+5. Deploy Infrastructure
+Run the following commands:
+
+
+cdktf get       # Generate provider bindings
+cdktf synth     # Synthesize Terraform JSON configuration
+cdktf deploy    # Deploy resources to Azure
+
+6. Verify the Storage Account
+After deployment, check Azure using:
+
+
+az storage account list --query "[].{name:name,location:primaryLocation}" --output table
+
+7. Check State File in Azure Blob Storage
+To ensure the Terraform state is stored in Azure:
+
+az storage blob list --container-name tfstate --account-name terraformbackendsa --output 
