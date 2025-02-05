@@ -1,0 +1,120 @@
+Example: Separate Resource Definitions with Parameters
+We will:
+
+Define parameters externally (e.g., using config.json or environment variables).
+Pass them into separate classes for the Resource Group and Storage Account.
+1️⃣ Install Dependencies
+Ensure you have CDKTF and the required provider:
+
+
+cdktf provider add hashicorp/azurerm
+2️⃣ Define Parameters in a Config File
+Create a config.json file:
+
+
+{
+  "resourceGroupName": "cdktf-rg",
+  "location": "East US",
+  "storageAccountName": "cdktfstorageacct",
+  "accountTier": "Standard",
+  "accountReplicationType": "LRS"
+}
+3️⃣ Create Separate Resource Classes
+Create resource-group.ts for the Resource Group:
+
+
+import { Construct } from "constructs";
+import { ResourceGroup } from "../.gen/providers/azurerm";
+
+export class ResourceGroupConstruct extends Construct {
+  public readonly name: string;
+  public readonly location: string;
+
+  constructor(scope: Construct, id: string, config: { name: string; location: string }) {
+    super(scope, id);
+
+    const resourceGroup = new ResourceGroup(this, "resourceGroup", {
+      name: config.name,
+      location: config.location,
+    });
+
+    this.name = resourceGroup.name;
+    this.location = resourceGroup.location;
+  }
+}
+Create storage-account.ts for the Storage Account:
+
+
+import { Construct } from "constructs";
+import { StorageAccount } from "../.gen/providers/azurerm";
+
+export class StorageAccountConstruct extends Construct {
+  constructor(
+    scope: Construct,
+    id: string,
+    config: { name: string; resourceGroupName: string; location: string; accountTier: string; accountReplicationType: string }
+  ) {
+    super(scope, id);
+
+    new StorageAccount(this, "storageAccount", {
+      name: config.name,
+      resourceGroupName: config.resourceGroupName,
+      location: config.location,
+      accountTier: config.accountTier,
+      accountReplicationType: config.accountReplicationType,
+    });
+  }
+}
+4️⃣ Load Configuration in the Main Stack
+Modify main.ts to load configurations from config.json and pass them to separate constructs:
+
+
+import { Construct } from "constructs";
+import { App, TerraformStack } from "cdktf";
+import { AzurermProvider } from "./.gen/providers/azurerm";
+import * as fs from "fs";
+import { ResourceGroupConstruct } from "./resource-group";
+import { StorageAccountConstruct } from "./storage-account";
+
+class MyStack extends TerraformStack {
+  constructor(scope: Construct, id: string) {
+    super(scope, id);
+
+    // Load configuration from JSON
+    const config = JSON.parse(fs.readFileSync("config.json", "utf8"));
+
+    // Initialize Azure Provider
+    new AzurermProvider(this, "AzureRm", { features: {} });
+
+    // Create Resource Group
+    const resourceGroup = new ResourceGroupConstruct(this, "ResourceGroup", {
+      name: config.resourceGroupName,
+      location: config.location,
+    });
+
+    // Create Storage Account and pass resource group name dynamically
+    new StorageAccountConstruct(this, "StorageAccount", {
+      name: config.storageAccountName,
+      resourceGroupName: resourceGroup.name,
+      location: resourceGroup.location,
+      accountTier: config.accountTier,
+      accountReplicationType: config.accountReplicationType,
+    });
+  }
+}
+
+const app = new App();
+new MyStack(app, "cdktf-azure");
+app.synth();
+5️⃣ Deploy Infrastructure
+Run the following commands:
+
+
+cdktf get        # Generate provider bindings
+cdktf synth      # Synthesize Terraform configuration
+cdktf deploy     # Deploy resources to Azure
+6️⃣ Verify Deployment
+Check deployed resources in Azure:
+
+az group show --name cdktf-rg
+az storage account show --name cdktfstorageacct --resource-group cdktf-rg
