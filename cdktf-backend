@@ -1,0 +1,96 @@
+Store Terraform State in Azure Storage Account using CDKTF
+To persist Terraform state in an Azure Storage Account, we need to configure Terraform's remote backend with azurerm. This ensures that the Terraform state file (terraform.tfstate) is stored securely in Azure Blob Storage, enabling collaboration and state locking.
+
+1️⃣ Prerequisites
+Ensure you have:
+
+Azure CLI installed: az --version
+CDKTF installed: npm install -g cdktf-cli
+Terraform installed: terraform -v
+An Azure Storage Account & Container for state storage
+2️⃣ Create an Azure Storage Account for State Management
+If you haven't created a Storage Account and Container, run the following command:
+
+
+az group create --name tfstate-rg --location eastus
+
+az storage account create --name mytfstatebackend \
+    --resource-group tfstate-rg \
+    --location eastus \
+    --sku Standard_LRS \
+    --kind StorageV2 \
+    --access-tier Hot
+
+az storage container create --name tfstate \
+    --account-name mytfstatebackend
+This creates:
+
+Storage Account: mytfstatebackend
+Storage Container: tfstate
+3️⃣ Configure CDKTF to Use Azure Storage for State
+Modify your cdktf.json file OR configure the backend in main.ts.
+
+Option 1: Modify cdktf.json
+Edit your cdktf.json file and add:
+
+
+{
+  "terraform": {
+    "backend": {
+      "azurerm": {
+        "resource_group_name": "tfstate-rg",
+        "storage_account_name": "mytfstatebackend",
+        "container_name": "tfstate",
+        "key": "cdktf.tfstate"
+      }
+    }
+  }
+}
+Option 2: Configure Backend in main.ts
+Alternatively, modify main.ts to define the backend using CDKTF's Remote Backend:
+
+typescript
+Copy
+Edit
+import { Construct } from "constructs";
+import { App, TerraformStack, TerraformBackend } from "cdktf";
+import { AzurermProvider } from "./.gen/providers/azurerm";
+
+class MyStack extends TerraformStack {
+  constructor(scope: Construct, id: string) {
+    super(scope, id);
+
+    // Configure Terraform backend
+    new TerraformBackend(this, {
+      type: "azurerm",
+      config: {
+        resource_group_name: "tfstate-rg",
+        storage_account_name: "mytfstatebackend",
+        container_name: "tfstate",
+        key: "cdktf.tfstate"
+      }
+    });
+
+    // Initialize Azure Provider
+    new AzurermProvider(this, "AzureRm", { features: {} });
+
+    // Add your resources here...
+  }
+}
+
+const app = new App();
+new MyStack(app, "cdktf-azure-storage");
+app.synth();
+4️⃣ Deploy Infrastructure with Remote State
+Run the following commands:
+
+
+cdktf get        # Generate provider bindings
+cdktf synth      # Synthesize Terraform configuration
+cdktf deploy     # Deploy resources and store state in Azure
+5️⃣ Verify State File in Azure
+After deployment, check if the Terraform state file is stored in the Azure Blob Storage:
+
+
+az storage blob list --container-name tfstate \
+    --account-name mytfstatebackend --output table
