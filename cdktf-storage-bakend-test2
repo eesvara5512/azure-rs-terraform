@@ -1,0 +1,123 @@
+🚀 Steps to Configure Terraform Backend in Azure Storage
+Set up CDKTF and Install Providers
+Define Azure Storage Account & Container
+Configure Terraform Backend in CDKTF
+Deploy the Infrastructure
+Initialize the Terraform Backend
+1️⃣ Set Up CDKTF and Install Providers
+If you haven't initialized a CDKTF project, do it now:
+
+sh
+Copy
+Edit
+npm install -g cdktf
+cdktf init --template=typescript
+Then, install the Azure provider:
+
+sh
+Copy
+Edit
+cdktf provider add hashicorp/azurerm
+2️⃣ Define Azure Storage Account & Container
+Create the CDKTF stack in main.ts:
+
+typescript
+Copy
+Edit
+import { Construct } from "constructs";
+import { App, TerraformStack, TerraformOutput, TerraformBackend } from "cdktf";
+import { AzurermProvider, StorageAccount, StorageContainer, ResourceGroup } from "@cdktf/provider-azurerm";
+
+class MyStack extends TerraformStack {
+  constructor(scope: Construct, id: string) {
+    super(scope, id);
+
+    // Azure Provider
+    new AzurermProvider(this, "AzureRm", {
+      features: {},
+    });
+
+    // Resource Group
+    const resourceGroup = new ResourceGroup(this, "rg", {
+      name: "cdktf-rg",
+      location: "East US",
+    });
+
+    // Storage Account
+    const storageAccount = new StorageAccount(this, "storage", {
+      name: "cdktfstoracct",
+      resourceGroupName: resourceGroup.name,
+      location: resourceGroup.location,
+      accountTier: "Standard",
+      accountReplicationType: "LRS",
+    });
+
+    // Storage Container for Terraform State
+    const storageContainer = new StorageContainer(this, "tfstate", {
+      name: "tfstate-container",
+      storageAccountName: storageAccount.name,
+      containerAccessType: "private",
+    });
+
+    // Output Storage Account & Container
+    new TerraformOutput(this, "storage_account_name", {
+      value: storageAccount.name,
+    });
+
+    new TerraformOutput(this, "storage_container_name", {
+      value: storageContainer.name,
+    });
+
+    // Configure Terraform Backend for State Storage
+    new TerraformBackend(this, {
+      name: "azurerm",
+      config: {
+        resource_group_name: resourceGroup.name,
+        storage_account_name: storageAccount.name,
+        container_name: storageContainer.name,
+        key: "terraform.tfstate",
+      },
+    });
+  }
+}
+
+// Initialize the App and Stack
+const app = new App();
+new MyStack(app, "cdktf-azure");
+app.synth();
+3️⃣ Deploy the Infrastructure
+Run the following commands:
+
+sh
+Copy
+Edit
+cdktf get
+cdktf synth
+cdktf deploy
+This will create: ✅ Azure Resource Group
+✅ Azure Storage Account
+✅ Storage Container
+✅ Terraform Backend Configuration
+
+4️⃣ Initialize Terraform Backend
+After deployment, Terraform needs to initialize the backend.
+
+Run:
+
+sh
+Copy
+Edit
+terraform init
+If you already have an existing Terraform state locally, migrate it to Azure:
+
+sh
+Copy
+Edit
+terraform init -migrate-state
+✅ Summary
+Step	Command
+Initialize CDKTF	cdktf init --template=typescript
+Install Azure Provider	cdktf provider add hashicorp/azurerm
+Deploy Resources	cdktf deploy
+Initialize Backend	terraform init
+Now, Terraform state (terraform.tfstate) will be stored in Azure Storage, making it shareable and secure! 🚀🔥
