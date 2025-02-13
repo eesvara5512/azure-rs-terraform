@@ -86,6 +86,16 @@ cdktf deploy
 If you still hit the error, what's the exact error message and stack trace you're getting? That can help pinpoint the issue.
 
 
+------------
+
+
+
+export ARM_CLIENT_ID=<app-id>
+export ARM_CLIENT_SECRET=<password>
+export ARM_SUBSCRIPTION_ID=<subscription-id>
+export ARM_TENANT_ID=<tenant-id>
+
+
 
 
 
