@@ -1,0 +1,93 @@
+Common Causes and Solutions:
+1. Azure CLI Not Logged In
+Make sure you’re logged into Azure using the CLI:
+
+bash
+Copy
+Edit
+az login
+Check your active subscription:
+
+bash
+Copy
+Edit
+az account show
+If you have multiple subscriptions, set the desired one:
+
+bash
+Copy
+Edit
+az account set --subscription <SUBSCRIPTION_ID>
+2. Missing Environment Variables / Credentials
+If you are running this in a non-interactive environment (like CI/CD), you may need a Service Principal:
+
+Create a Service Principal:
+bash
+Copy
+Edit
+az ad sp create-for-rbac --name "cdktf-backend" --role Contributor --scopes /subscriptions/<SUBSCRIPTION_ID>
+This will output:
+
+json
+Copy
+Edit
+{
+  "appId": "xxxxxxx",
+  "displayName": "cdktf-backend",
+  "password": "xxxxxxx",
+  "tenant": "xxxxxxx"
+}
+Set the following environment variables:
+bash
+Copy
+Edit
+export ARM_CLIENT_ID=<appId>
+export ARM_CLIENT_SECRET=<password>
+export ARM_TENANT_ID=<tenant>
+export ARM_SUBSCRIPTION_ID=<SUBSCRIPTION_ID>
+CDKTF and Terraform will automatically pick these up.
+
+3. Check the Backend Configuration
+Ensure your backend block is correct, especially the storage account name, container, and key fields. If these are wrong, Azure will reject the request.
+
+Example override:
+
+typescript
+Copy
+Edit
+this.addOverride("terraform.backend", {
+  azurerm: {
+    resource_group_name: "my-resource-group",
+    storage_account_name: "mystorageaccount",
+    container_name: "mycontainer",
+    key: "terraform.tfstate",
+  },
+});
+Ensure the storage account and container already exist if you're not provisioning them in your CDKTF code.
+
+4. Provider Configuration
+Ensure the AzureRM provider block is properly configured:
+
+typescript
+Copy
+Edit
+new AzurermProvider(this, "AzureRm", {
+  features: {},
+});
+This is usually sufficient if you’re using the environment variables or Azure CLI auth.
+
+Final Test
+Once you’ve set up the environment variables or logged in via az login, try running:
+
+bash
+Copy
+Edit
+cdktf deploy
+If you still hit the error, what's the exact error message and stack trace you're getting? That can help pinpoint the issue.
+
+
+
+
+
+
+
